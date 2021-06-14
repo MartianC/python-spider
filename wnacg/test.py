@@ -1,4 +1,6 @@
 import  re
 
-url = 'https://www.wnacg.com/photos-view-id-10697193.html'
-print(re.match('(.*)id-', url).group())
+url = ' 24張照片，創建於2021-06-3 '
+aa = re.search('[0-9]*-[0-9]*-[0-9]*', url).group()
+print(aa)
+# print(re.match('(.*)id-', url).group())
