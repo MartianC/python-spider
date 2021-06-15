@@ -1,6 +1,6 @@
 import  re
 
-url = ' 24張照片，創建於2021-06-3 '
-aa = re.search('[0-9]*-[0-9]*-[0-9]*', url).group()
+url = 'D:/下载/wnacg/aaa.zip'
+aa = re.search('.*/', url).group()
 print(aa)
 # print(re.match('(.*)id-', url).group())
