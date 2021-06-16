@@ -8,10 +8,27 @@ import zipfile
 import time
 
 
-def albums_url(idx):
+
+
+def recent_url(idx):
     return 'https://www.wnacg.com/albums-index-page-' + str(idx) + '.html'
+def doujin_url(idx):
+    return 'https://www.wnacg.com/albums-index-page-' + str(idx) + '-cate-5.html'
 def offprint_url(idx):
     return 'https://www.wnacg.com/albums-index-page-' + str(idx) + '-cate-9.html'
+def short_url(idx):
+    return 'https://www.wnacg.com/albums-index-page-' + str(idx) + '-cate-10.html'
+def korea_url(idx):
+    return 'https://www.wnacg.com/albums-index-page-' + str(idx) + '-cate-20.html'
+
+
+manga_type = {
+    0: recent_url,      #最近更新
+    1: doujin_url,      #同人志
+    2: offprint_url,    #单行本
+    3: short_url,       #短篇
+    4: korea_url,       #韩漫
+}
 
 # def requests_get(self, url):
 #     https = {'https': 'socks5://127.0.0.1:7890'}
@@ -74,6 +91,7 @@ class Manga:
 class Crawler():
 
     manga_list = []
+    manga_type_url = recent_url
     save_path = ''
     sleep_time = 3
     sleep_time_short = 1
@@ -83,9 +101,9 @@ class Crawler():
         pageidx = 1
         findFinish = False
         self.manga_list.clear()
-        print('开始查找')
+        print('开始查找...')
         while(not findFinish):
-            aa = offprint_url(pageidx)
+            aa = self.manga_type_url(pageidx)
             # r = self.requests_get(aa)
             time.sleep(self.sleep_time)
             r = requests.get(aa)
@@ -107,55 +125,7 @@ class Crawler():
                 self.manga_list.append(manga_obj)
             pageidx = pageidx + 1
             print('\r找到' + str(len(self.manga_list)) + '个结果...', end='')
-        print('\r找到'+ str(len(self.manga_list)) + '个结果 查找结束')
-
-    def download_backup(self, i, manga):
-        time.sleep(self.sleep_time)
-        r = requests.get(manga.url)
-        r.encoding = 'utf-8'
-        html = r.text
-        soup = BeautifulSoup(html, 'html.parser')
-        # 获取分类
-        type = soup.find(class_='asTBcell uwconn').label.string
-        type = type.replace(' ', '')
-        manga.type = type[3:len(type)]
-        # 封面下载
-        path = os.path.join(self.save_path, manga.type, manga.name)
-        photos_url = soup.find(class_='pic_box tb').a.attrs['href']
-        photos_url = url + photos_url
-        r = requests.get(photos_url)
-        r.encoding = 'utf-8'
-        html = r.text
-        soup = BeautifulSoup(html, 'html.parser')
-        image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
-        imgae_idx = soup.find('img', id='picarea').attrs['alt']
-        image_path = os.path.join(path, imgae_idx + '.png')
-        urlretrieve(image_url, image_path)
-        # 剩余页
-        url_prefix = re.match('(.*)id-', photos_url).group()
-        content_opt_list = soup.findAll('option')
-        content_url_list = []
-        idx = 1
-        while (idx < len(content_opt_list)):
-            content_url = url_prefix + content_opt_list[idx].attrs['value'] + '.html'
-            content_url_list.append(content_url)
-            idx = idx + 1
-        for j, content_url in enumerate(content_url_list):
-            time.sleep(self.sleep_time_short)
-            r = requests.get(content_url)
-            r.encoding = 'utf-8'
-            html = r.text
-            soup = BeautifulSoup(html, 'html.parser')
-            image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
-            imgae_idx = soup.find('img', id='picarea').attrs['alt']
-            # FOR macOS
-            # image_path = os.path.join(path, imgae_idx + '.png')
-            # FOR Windows
-            image_path = path + '/' + imgae_idx + '.png'
-            urlretrieve(image_url, image_path)
-            print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...(' + str(
-                j + 1) + '/' + str(len(content_url_list) + 1) + ')', end='')
-        print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...[DONE]', end='\n')
+        print('\r共找到'+ str(len(self.manga_list)) + '个结果')
 
     def download_zip(self):
         for i, manga in enumerate(self.manga_list):
@@ -208,12 +178,75 @@ class Crawler():
                     print('[Failed]')
         print('全部下载完成')
 
+    def download_backup(self, i, manga):
+        time.sleep(self.sleep_time)
+        r = requests.get(manga.url)
+        r.encoding = 'utf-8'
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        # 获取分类
+        type = soup.find(class_='asTBcell uwconn').label.string
+        type = type.replace(' ', '')
+        manga.type = type[3:len(type)]
+        # 封面下载
+        path = os.path.join(self.save_path, manga.type, manga.name)
+        photos_url = soup.find(class_='pic_box tb').a.attrs['href']
+        photos_url = url + photos_url
+        r = requests.get(photos_url)
+        r.encoding = 'utf-8'
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
+        imgae_idx = soup.find('img', id='picarea').attrs['alt']
+        image_path = os.path.join(path, imgae_idx + '.png')
+        urlretrieve(image_url, image_path)
+        # 剩余页
+        url_prefix = re.match('(.*)id-', photos_url).group()
+        content_opt_list = soup.findAll('option')
+        content_url_list = []
+        idx = 1
+        while (idx < len(content_opt_list)):
+            content_url = url_prefix + content_opt_list[idx].attrs['value'] + '.html'
+            content_url_list.append(content_url)
+            idx = idx + 1
+        for j, content_url in enumerate(content_url_list):
+            time.sleep(self.sleep_time_short)
+            r = requests.get(content_url)
+            r.encoding = 'utf-8'
+            html = r.text
+            soup = BeautifulSoup(html, 'html.parser')
+            image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
+            imgae_idx = soup.find('img', id='picarea').attrs['alt']
+            # FOR macOS
+            # image_path = os.path.join(path, imgae_idx + '.png')
+            # FOR Windows
+            image_path = path + '/' + imgae_idx + '.png'
+            urlretrieve(image_url, image_path)
+            print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...(' + str(
+                j + 1) + '/' + str(len(content_url_list) + 1) + ')', end='')
+        print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...[DONE]', end='\n')
+
+
+
 if __name__ == '__main__':
 
     url = 'https://www.wnacg.com'
 
     crawl = Crawler()
     crawl.save_path = 'D:/下载/wnacg/'
+
+    str_ = input('设定查找的类型：\n0: 最近更新\n1: 同人\n2: 单行本\n3: 杂志/短篇\n4: 韩漫\n')
+    while True:
+        try:
+            type_key = int(str_)
+        except:
+            str_ = input()
+            continue
+        if type_key in manga_type:
+            break
+        str_ = input()
+    crawl.manga_type_url = manga_type.get(type_key)
+
     str_ = input('设定查找的天数：')
     while True:
         try:
@@ -222,6 +255,7 @@ if __name__ == '__main__':
         except:
             str_ = input()
     crawl.find_manga(day)
+
     str_ = input('下载路径:'+ crawl.save_path +',是否开始下载？(y/n)')
     while str_ != 'y' and str_ != 'n':
         str_ = input()
