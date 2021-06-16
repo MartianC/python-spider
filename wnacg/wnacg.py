@@ -5,7 +5,7 @@ from urllib.request import urlretrieve
 import re
 import requests
 import zipfile
-from multiprocessing import Pool
+import time
 
 
 def albums_url(idx):
@@ -45,9 +45,20 @@ class Manga:
     url = ''
 
     def __init__(self, name, url, date):
-        self.name = name
         self.url = url
         self.date = date
+
+        name = name.replace('?','_')
+        name = name.replace('\\','_')
+        name = name.replace('*','_')
+        name = name.replace('|','_')
+        name = name.replace('\"','_')
+        name = name.replace('<','_')
+        name = name.replace('>','_')
+        name = name.replace(':','_')
+        name = name.replace('/','_')
+        self.name = name
+
 
     def toString(self):
         print('\nname=' + self.name + '\nurl=' + self.url + '\ntype=' + self.type + '\ndate=' + self.date)
@@ -64,6 +75,8 @@ class Crawler():
 
     manga_list = []
     save_path = ''
+    sleep_time = 3
+    sleep_time_short = 1
 
     def find_manga(self, datelenth):
         today = datetime.today()
@@ -72,8 +85,9 @@ class Crawler():
         self.manga_list.clear()
         print('开始查找')
         while(not findFinish):
-            aa = albums_url(pageidx)
+            aa = offprint_url(pageidx)
             # r = self.requests_get(aa)
+            time.sleep(self.sleep_time)
             r = requests.get(aa)
             r.encoding = 'utf-8'
             html = r.text
@@ -95,65 +109,58 @@ class Crawler():
             print('\r找到' + str(len(self.manga_list)) + '个结果...', end='')
         print('\r找到'+ str(len(self.manga_list)) + '个结果 查找结束')
 
-    def download_highQuality(self):
-        for i, manga in enumerate(self.manga_list):
-            print('(' + str(i+1) + '/' + str(len(self.manga_list)) +')' + manga.name + '...', end='')
-            r = requests.get(manga.url)
+    def download_backup(self, i, manga):
+        time.sleep(self.sleep_time)
+        r = requests.get(manga.url)
+        r.encoding = 'utf-8'
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        # 获取分类
+        type = soup.find(class_='asTBcell uwconn').label.string
+        type = type.replace(' ', '')
+        manga.type = type[3:len(type)]
+        # 封面下载
+        path = os.path.join(self.save_path, manga.type, manga.name)
+        photos_url = soup.find(class_='pic_box tb').a.attrs['href']
+        photos_url = url + photos_url
+        r = requests.get(photos_url)
+        r.encoding = 'utf-8'
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
+        imgae_idx = soup.find('img', id='picarea').attrs['alt']
+        image_path = os.path.join(path, imgae_idx + '.png')
+        urlretrieve(image_url, image_path)
+        # 剩余页
+        url_prefix = re.match('(.*)id-', photos_url).group()
+        content_opt_list = soup.findAll('option')
+        content_url_list = []
+        idx = 1
+        while (idx < len(content_opt_list)):
+            content_url = url_prefix + content_opt_list[idx].attrs['value'] + '.html'
+            content_url_list.append(content_url)
+            idx = idx + 1
+        for j, content_url in enumerate(content_url_list):
+            time.sleep(self.sleep_time_short)
+            r = requests.get(content_url)
             r.encoding = 'utf-8'
             html = r.text
             soup = BeautifulSoup(html, 'html.parser')
-            # 获取分类
-            type = soup.find(class_='asTBcell uwconn').label.string
-            type = type.replace(' ','')
-            manga.type = type[3:len(type)]
-            # 创建目录
-            path = os.path.join(self.save_path, manga.type, manga.name)
-            try:
-                os.makedirs(path)
-            except OSError:
-                if os.path.isdir(path):
-                    print(' 已有，跳过')
-                    continue
-            photos_url = soup.find(class_ = 'pic_box tb').a.attrs['href']
-            photos_url = url + photos_url
-            # 封面下载
-            r = requests.get(photos_url)
-            r.encoding = 'utf-8'
-            html = r.text
-            soup = BeautifulSoup(html, 'html.parser')
-            image_url = 'https:' + soup.find('img', id = 'picarea').attrs['src']
-            imgae_idx = soup.find('img', id = 'picarea').attrs['alt']
-            image_path = os.path.join(path, imgae_idx + '.png')
+            image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
+            imgae_idx = soup.find('img', id='picarea').attrs['alt']
+            # FOR macOS
+            # image_path = os.path.join(path, imgae_idx + '.png')
+            # FOR Windows
+            image_path = path + '/' + imgae_idx + '.png'
             urlretrieve(image_url, image_path)
-            # 剩余页
-            url_prefix = re.match('(.*)id-', photos_url).group()
-            content_opt_list = soup.findAll('option')
-            content_url_list = []
-            idx = 1
-            while (idx < len(content_opt_list)):
-                content_url = url_prefix + content_opt_list[idx].attrs['value'] + '.html'
-                content_url_list.append(content_url)
-                idx = idx + 1
-            for j, content_url in enumerate(content_url_list):
-                r = requests.get(content_url)
-                r.encoding = 'utf-8'
-                html = r.text
-                soup = BeautifulSoup(html, 'html.parser')
-                image_url = 'https:' + soup.find('img', id='picarea').attrs['src']
-                imgae_idx = soup.find('img', id='picarea').attrs['alt']
-                # FOR macOS
-                # image_path = os.path.join(path, imgae_idx + '.png')
-                # FOR Windows
-                image_path = path + '/' + imgae_idx + '.png'
-                urlretrieve(image_url, image_path)
-                print('\r' + '(' + str(i+1) + '/' + str(len(self.manga_list)) +')' + manga.name + '...(' + str(j+1) + '/' + str(len(content_url_list)+1) +')', end='')
-            print('\r' + '(' + str(i+1) + '/' + str(len(self.manga_list)) +')' + manga.name + '...DONE', end='\n')
-        print('全部下载完成')
+            print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...(' + str(
+                j + 1) + '/' + str(len(content_url_list) + 1) + ')', end='')
+        print('\r' + '(' + str(i + 1) + '/' + str(len(self.manga_list)) + ')' + manga.name + '...[DONE]', end='\n')
 
     def download_zip(self):
-        p = Pool(6)
         for i, manga in enumerate(self.manga_list):
             print('(' + str(i+1) + '/' + str(len(self.manga_list)) +')' + manga.name + '...', end='')
+            time.sleep(self.sleep_time)
             r = requests.get(manga.url)
             r.encoding = 'utf-8'
             html = r.text
@@ -168,7 +175,7 @@ class Crawler():
                 os.makedirs(path)
             except OSError:
                 if os.path.isdir(path):
-                    print(' 已有，跳过')
+                    print('[SKIP]')
                     continue
             # 创建目录
             # path = os.path.join(self.save_path, manga.type)
@@ -190,13 +197,15 @@ class Crawler():
                 print('[SKIP]')
                 continue
             try:
-                # 提交到子进程
-                p.apply(downLoad_and_unzip, args=(dld_url, dld_path))
+                urlretrieve(dld_url, dld_path)
+                unzip(dld_path)
                 print('[DONE]')
             except:
-                print('[Failed]')
-        p.close()
-        p.join()
+                # 下载链接失效，备用按张下载
+                try:
+                    self.download_backup(i, manga)
+                except:
+                    print('[Failed]')
         print('全部下载完成')
 
 if __name__ == '__main__':
