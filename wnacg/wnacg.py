@@ -95,6 +95,7 @@ class Crawler():
     save_path = ''
     sleep_time = 3
     sleep_time_short = 1
+    auto_unzip = True
 
     def find_manga(self, datelenth):
         today = datetime.today()
@@ -168,7 +169,8 @@ class Crawler():
                 continue
             try:
                 urlretrieve(dld_url, dld_path)
-                unzip(dld_path)
+                if self.auto_unzip:
+                    unzip(dld_path)
                 print('[DONE]')
             except:
                 # 下载链接失效，备用按张下载
